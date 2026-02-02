@@ -1,0 +1,83 @@
+import pygame, random
+
+# Configuration
+W, H, S = 10, 20, 30
+COLORS = [(0,0,0), (255,0,0), (0,255,0), (0,0,255), (255,255,0), (255,165,0), (0,255,255), (128,0,128)]
+SHAPES = [[], [[1,1,1,1]], [[1,1],[1,1]], [[0,1,0],[1,1,1]], [[0,1,1],[1,1,0]], [[1,1,0],[0,1,1]], [[1,0,0],[1,1,1]], [[0,0,1],[1,1,1]]]
+
+class Tetris:
+    def __init__(self):
+        self.grid = [[0] * W for _ in range(H)]
+        self.score = 0
+        self.new_piece()
+
+    def new_piece(self):
+        self.piece = random.choice(SHAPES[1:])
+        self.color = SHAPES.index(self.piece)
+        self.x, self.y = W // 2 - len(self.piece[0]) // 2, 0
+        if self.check_collision(self.x, self.y, self.piece): self.__init__()
+
+    def check_collision(self, dx, dy, p):
+        for r, row in enumerate(p):
+            for c, val in enumerate(row):
+                if val:
+                    new_x, new_y = dx + c, dy + r
+                    if new_x < 0 or new_x >= W or new_y >= H or (new_y >= 0 and self.grid[new_y][new_x]):
+                        return True
+        return False
+
+    def rotate(self):
+        r = [list(row) for row in zip(*self.piece[::-1])]
+        if not self.check_collision(self.x, self.y, r): self.piece = r
+
+    def lock(self):
+        for r, row in enumerate(self.piece):
+            for c, val in enumerate(row):
+                if val: self.grid[self.y+r][self.x+c] = self.color
+        lines = [r for r in self.grid if any(v == 0 for v in r)]
+        cleared = H - len(lines)
+        self.score += cleared * 100
+        self.grid = [[0] * W for _ in range(cleared)] + lines
+        self.new_piece()
+
+    def move(self, dx, dy):
+        if not self.check_collision(self.x + dx, self.y + dy, self.piece):
+            self.x, self.y = self.x + dx, self.y + dy
+            return True
+        if dy: self.lock()
+        return False
+
+    def hard_drop(self):
+        while self.move(0, 1): pass
+
+pygame.init()
+sc = pygame.display.set_mode((W*S, H*S))
+font = pygame.font.SysFont('Arial', 25)
+game, clock = Tetris(), pygame.time.Clock()
+tick = 0
+
+while True:
+    sc.fill((0,0,0))
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT: exit()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT: game.move(-1, 0)
+            if event.key == pygame.K_RIGHT: game.move(1, 0) # Fixed right move
+            if event.key == pygame.K_DOWN: game.hard_drop() # Fixed instant drop
+            if event.key == pygame.K_UP: game.rotate()
+
+    tick += clock.tick(60)
+    if tick > 500:
+        game.move(0, 1)
+        tick = 0
+
+    # Draw Logic
+    for y, r in enumerate(game.grid):
+        for x, v in enumerate(r):
+            if v: pygame.draw.rect(sc, COLORS[v], (x*S, y*S, S-1, S-1))
+    for r, row in enumerate(game.piece):
+        for c, v in enumerate(row):
+            if v: pygame.draw.rect(sc, COLORS[game.color], ((game.x+c)*S, (game.y+r)*S, S-1, S-1))
+    
+    sc.blit(font.render(f'Score: {game.score}', True, (255,255,255)), (10, 10))
+    pygame.display.flip()
